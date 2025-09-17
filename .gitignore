@@ -1,21 +1,29 @@
-# Node / build
+# Node
 node_modules/
-dist/
-build/
+npm-debug.log*
+yarn.lock
+package-lock.json
 
-# Secrets & env
+# Env / Secrets
 .env
+.env.*
+*.env
+*.env.*
 .env.local
-*.key
-*.pem
+.env.production
+.env.development
 
-# DB / logs
+# DB/SQLite
 *.sqlite
 *.sqlite3
 *.db
+db/*.sqlite*
+db.sqlite*
+
+# Logs
 logs/
 *.log
 
-# OS/editor
+# OS junk
 .DS_Store
-*.swp
+Thumbs.db
