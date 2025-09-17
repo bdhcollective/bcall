@@ -1,0 +1,235 @@
+/* Reset de base */
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: 'Segoe UI', sans-serif;
+}
+
+body {
+  background-color: #f5f6fa;
+  color: #2f3640;
+  width: 100%;
+  max-width: 1200px;
+  height: 100vh;
+  margin: auto;
+}
+
+.chat-container {
+  background-color: #fff;
+  height: 90vh;
+  width: 100%;
+  display: flex;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.chat-list {
+  width: 30%;
+  background-color: #f1f2f6;
+  padding: 20px;
+  overflow-y: auto;
+  border-right: 1px solid #dcdde1;
+}
+
+.chat-item {
+  background: #fff;
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+.chat-item:hover {
+  background-color: #e1e2e6;
+}
+
+.messages {
+  width: 70%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #ecf0f1;
+  position: relative;
+}
+
+.message-group {
+  margin-bottom: 20px;
+}
+
+.message-group h4 {
+  margin-bottom: 8px;
+  font-size: 16px;
+  font-weight: bold;
+  color: #2d3436;
+  margin: 20px 0 10px 0; 
+  display: block;
+  clear: both; 
+}
+
+.message {
+  max-width: 70%;
+  padding: 10px 14px;
+  margin: 6px 0;
+  border-radius: 18px;
+  line-height: 1.4;
+  position: relative;
+  word-wrap: break-word;
+  display: inline-block;
+  clear: both;
+}
+
+.message.sent {
+  float: right;
+  background-color: #0984e3;
+  color: white;
+  border-bottom-right-radius: 2px;
+  text-align: left;
+  margin-left: auto;
+}
+
+.message.received {
+  float: left;
+  background-color: #dfe6e9;
+  color: #2d3436;
+  border-bottom-left-radius: 2px;
+  text-align: left;
+  margin-right: auto;
+}
+
+.message.call {
+  font-style: italic;
+  background-color: #ffeaa7;
+  color: #2d3436;
+  float: none;              
+  margin-left: auto;        
+  margin-right: auto;       
+  text-align: center;       
+  display: block;           
+  max-width: 60%;     
+}
+
+input[type="text"],
+textarea {
+  width: 100%;
+  padding: 10px 14px;
+  margin-top: 8px;
+  border: 1px solid #dcdde1;
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+}
+
+textarea {
+  resize: none;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.button-group button, #BdhBtn, #BernardsonBtn {
+  flex: 1;
+  background-color: #00b894;
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.3s;
+}
+.button-group button:hover {
+  background-color: #019875;
+}
+
+@media (max-width: 768px) {
+  .chat-container {
+    flex-direction: column;
+  }
+  .chat-list {
+    width: 90%;
+    padding: 5px;
+    height: 50%;
+  }
+  .messages {
+    width: 100%;
+    padding: 5px;
+    height: 50%;
+  }
+  .button-group button{
+    padding: 5px;
+    border-radius: 5px;
+  }
+  .button-group{
+    gap: 5px;
+  }
+}
+
+.btn-edit{
+  flex: 1;
+  background-color: #019875;
+  color: white;
+  border: none;
+  padding: 0px 8px;
+  margin-left: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.btnRetour{
+  flex: 1;
+  border: none;
+  padding: 0px 8px;
+  margin-left: 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+/* Barre du haut */
+.top-bar {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-bottom: 1px solid #ccc;
+    width: 100%;
+
+}
+
+/* Zone téléphone */
+.phone-bar {
+    display: flex;
+    gap: 10px;
+    padding: 10px;
+    background-color: #fafafa;
+    border-bottom: 1px solid #ccc;
+    width: 100%;
+}
+.phone-number-item{
+  flex: 1;
+  background-color: white;
+  color: black;
+  border: solid 1px gray;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+  text-align: center;
+}
+.phone-number-item.active {
+  background-color: #050505; 
+  color: white;              
+  font-weight: bold;
+}
+
+/* Corps principal */
+.main-content {
+    display: flex;
+    flex: 1;
+}

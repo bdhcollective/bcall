@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow">
+    <title>Twilio Messaging</title>
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://media.twiliocdn.com/sdk/js/client/v1.13/twilio.min.js"></script>
+    <script src="https://sdk.twilio.com/js/client/v1.14/twilio.min.js"></script>
+</head>
+
+<body>
+     <!-- Top bar companies -->
+        <div class="top-bar">
+            <button id="BdhBtn">BDH Collective</button>
+            <button id="BernardsonBtn">Bernardson</button>
+        </div>
+
+        <!-- Telephone Zone telephone number associated with the companies -->
+        <div class="phone-bar"></div>
+
+    <div class="chat-container">
+        <!-- Main body -->
+        <div class="main-content">
+            <!-- List of messages -->
+            <div id="chat-list" class="chat-list">
+                <!-- Recent contacts -->
+            </div>
+
+            <!-- Chats zone -->
+            <div class="messages">
+                <div id="message-list"></div>
+
+                <div id="message-form">
+                    <select id="twilio-number">
+                    </select>
+                    <input type="text" id="number" placeholder="Phone number +1..." />
+                    <textarea id="message" rows="3" placeholder="Your message..."></textarea>
+		    <input type="text" id= "numberCallThru" placeholder="Your phone number +1..."/>
+                    <div class="button-group">
+                        <button id="sendBtn">Send SMS</button>
+                        <button id="callBtn">Call</button>
+                        <button id="callThruBtn">Call Thru</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

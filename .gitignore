@@ -27,3 +27,27 @@ logs/
 # OS junk
 .DS_Store
 Thumbs.db
+
+# --- Frontend/Node ---
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.next/
+frontend/.output/
+# Env & secrets
+.env
+.env.*
+*.env
+*.env.*
+# Logs & caches
+npm-debug.log*
+yarn-error.log*
+.pnpm-store/
+# OS/editeurs
+.DS_Store
+.idea/
+.vscode/
+
+# SQLite (si tu ne veux pas versionner les DB locales)
+*.sqlite
+*.sqlite3

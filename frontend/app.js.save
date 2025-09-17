@@ -1,0 +1,505 @@
+const sendBtn = document.getElementById('sendBtn');
+const callBtn = document.getElementById('callBtn');
+const numberInput = document.getElementById('number');
+const messageInput = document.getElementById('message');
+const messagesListContainer = document.getElementById('message-list');
+const groupedMessages = {};
+const phoneBar = document.querySelector('.phone-bar');
+const btnBDH = document.getElementById('BdhBtn');
+const btnBernardson = document.getElementById('BernardsonBtn');
+const chatList = document.getElementById('chat-list');
+const select = document.getElementById('twilio-number');
+const numberCallThru =  document.getElementById('numberCallThru');
+async function getContactName(phone) {
+  try {
+    const response = await fetch(`/api/api/contacts/${encodeURIComponent(phone)}`);
+    if (response.ok) {
+      const contact = await response.json();
+      return contact.name || null;
+    }
+  } catch (err) {
+    console.error("Erreur lors de la récupération du contact :", err);
+  }
+  return null; // Si pas trouvé, on renvoie null
+}
+
+
+function saveContact(phoneNumber, name) {
+  fetch('/api/api/contacts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ phone: phoneNumber, name })
+  })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Contact enregistré:', data);
+      alert('Nom sauvegardé avec succès');
+    })
+    .catch(err => console.error('Erreur:', err));
+}
+function chargerNumerosTwilio() {
+  fetch('/api/getTwilioNumbers')
+    .then(res => res.json())
+    .then(data => {
+      if (data.success && Array.isArray(data.numbers)) {
+        data.numbers.forEach(num => {
+          const option = document.createElement('option');
+          option.value = num;
+          option.textContent = num;
+          select.appendChild(option);
+        });
+      } else {
+        alert("Erreur chargement numéros Twilio");
+      }
+    })
+    .catch(() => alert("Erreur réseau numéros Twilio"));
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  chargerNumerosTwilio();
+});
+
+async function renderMessages() {
+  // On vide le conteneur parent pour effacer l'ancienne conversation
+  messagesListContainer.innerHTML = '';
+
+  // Vérifie si l'objet est vide
+  const conversationNumbers = Object.keys(groupedMessages);
+  if (conversationNumbers.length === 0) {
+    messagesListContainer.innerHTML = '<p>Aucune conversation sélectionnée.</p>';
+    return;
+  }
+
+  // Puisqu'on ne gère qu'une seule conversation à la fois, on prend la première clé
+  const number = conversationNumbers[0];
+  const messages = groupedMessages[number];
+
+  const section = document.createElement('div');
+  section.className = 'message-group';
+  const btnRetour = document.createElement('button');
+  btnRetour.className = 'btnRetour';
+  btnRetour.textContent = '←';
+  const contactName = await getContactName(number);
+  const header = document.createElement('h4');
+  header.textContent = `Conversation avec ${contactName || number}`;
+  const btn = document.createElement('button');
+  btn.className = 'btn-edit';
+  btn.textContent = 'Edit';
+  btn.addEventListener('click', () => {
+    const newName = prompt('Entrez un nom pour ce numéro :', contactName || '');
+    if (newName && newName.trim()) {
+      saveContact(number, newName.trim());
+      renderMessages();
+    }
+  });
+  btnRetour.addEventListener('click', () => {
+    document.getElementById('message-list').innerHTML = '';
+  });
+  section.appendChild(header);
+  header.prepend(btnRetour);
+  header.appendChild(btn);
+
+  messages.forEach(msg => {
+    const div = document.createElement('div');
+    div.className = 'message ' + msg.type;
+
+    if (msg.type === 'call') {
+      if (msg.status) {
+        div.classList.add('status-' + msg.status);
+      }
+    }
+
+    div.textContent = msg.content;
+    section.appendChild(div);
+  });
+
+  messagesListContainer.appendChild(section);
+}
+
+
+function loadHistory(number, fromNumber) {
+  fetch(`/api/getHistory?number=${encodeURIComponent(number)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    }
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (!data.success || !Array.isArray(data.messages) || !Array.isArray(data.calls)) {
+        throw new Error('Format inattendu');
+      }
+      for (const key in groupedMessages) {
+        delete groupedMessages[key];
+      }
+
+      const messagesForNumber = [];
+
+      data.messages.forEach(msg => {
+        messagesForNumber.push({
+          type: msg.direction === 'outbound-api' ? 'sent' : 'received',
+          content: msg.body || '(message vide)',
+          date: msg.dateSent,
+          from: msg.from,
+          to: msg.to,
+          media: false
+        });
+      });
+
+      data.calls.forEach(call => {
+        messagesForNumber.push({
+          type: 'call',
+          subtype: call.direction,
+          status: call.status.toLowerCase(),
+          sid: call.sid,
+          content: `Appel ${call.direction} - ${call.status} (${call.duration || 0}s)`,
+          date: call.startTime,
+          from: call.from,
+          to: call.to,
+          media: false
+        });
+      });
+
+      messagesForNumber.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+      // On ajoute la nouvelle conversation à l'objet
+      groupedMessages[number] = messagesForNumber;
+
+      renderMessages();
+    })
+    .catch(err => {
+      console.error('Erreur chargement historique:', err);
+      alert("Impossible de charger l'historique");
+    });
+}
+numberInput.addEventListener('change', () => {
+  const number = numberInput.value.trim();
+  if (number) {
+    loadHistory(number);
+  }
+});
+
+function sendMessage() {
+  const number = numberInput.value.trim();
+  const text = messageInput.value.trim();
+
+  if (!number || !text) {
+    alert('Veuillez remplir tous les champs.');
+    return;
+  }
+
+  if (!groupedMessages[number]) {
+    groupedMessages[number] = [];
+  }
+
+  groupedMessages[number].push({ type: 'sent', content: text });
+  renderMessages();
+  const from = document.getElementById('twilio-number').value;
+
+  fetch('/api/sendSms', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ to: number, message: text, from })
+  })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Message envoyé', data);
+      setTimeout(() => loadHistory(number), 2000);
+    })
+    .catch(err => {
+      console.error('Erreur:', err);
+      alert('Erreur lors de l’envoi');
+    });
+
+  messageInput.value = '';
+}
+
+sendBtn.addEventListener('click', sendMessage);
+
+async function chargerListeChats() {
+  const url = '/api/getRecentsContacts';
+
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+
+    const data = await response.json();
+    chatList.innerHTML = '';
+
+    if (typeof data !== 'object' || data === null) return;
+
+    for (const [fromNumber, responseData] of Object.entries(data)) {
+      if (!responseData || !responseData.success || !Array.isArray(responseData.contacts)) {
+        console.error(`Données inattendues pour ${fromNumber} :`, responseData);
+        continue;
+      }
+      const nameNumber = await getContactName(fromNumber);
+      const section = document.createElement('div');
+      section.classList.add('twilio-section');
+
+      const header = document.createElement('h3');
+      header.textContent = `Depuis ${nameNumber || fromNumber}`;
+
+      section.appendChild(header);
+
+      for (const contact of responseData.contacts) {
+        const contactName = await getContactName(contact.number);
+        const displayName = contactName || contact.number;
+
+        const item = document.createElement('div');
+        item.classList.add('chat-item');
+
+        const lastMessage = contact.lastMessage || '(aucun message)';
+        const date = contact.dateSent
+          ? new Date(contact.dateSent).toLocaleString()
+          : 'Date inconnue';
+
+        item.innerHTML = `
+          <strong>${displayName}</strong><br>
+          <small>${date}</small><br>
+          <span>${lastMessage.slice(0, 30)}...</span>
+        `;
+
+        item.addEventListener('click', () => {
+          loadHistory(contact.number, fromNumber);
+          document.getElementById('twilio-number').value = fromNumber;
+          document.getElementById('number').value = contact.number;
+        });
+
+        section.appendChild(item);
+      }
+
+      chatList.appendChild(section);
+    }
+  } catch (err) {
+    console.error('Erreur lors du chargement des contacts récents :', err);
+  }
+}
+
+// Variable globale pour stocker l'ID de l'appel en cours
+let currentCallSid = null;
+function makeCall() {
+  const numberFrom = select.value.trim();
+  const number = numberInput.value.trim();
+  if (!number) {
+    alert('Veuillez entrer un numéro de téléphone.');
+    return;
+  }
+
+  callBtn.disabled = true;
+  callBtn.innerText = 'Appel en cours...';
+
+  fetch('/api/makeCall', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ to: number, from: numberFrom })
+  })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Appel lancé', data);
+      currentCallSid = data.sid;
+
+      callBtn.disabled = false;
+      callBtn.textContent = 'Raccrocher';
+
+      // Supprime l'ancien écouteur et ajoute le nouveau
+      callBtn.removeEventListener('click', makeCall);
+      callBtn.addEventListener('click', hangupCall);
+    })
+    .catch(err => {
+      console.error('Erreur:', err);
+      alert('Erreur lors du lancement de l’appel');
+
+      callBtn.disabled = false;
+      callBtn.innerText = 'Passer un appel';
+    });
+}
+
+function hangupCall() {
+  if (!currentCallSid) {
+    alert("Aucun appel en cours à raccrocher.");
+    return;
+  }
+
+  callBtn.disabled = true;
+  callBtn.innerText = 'Raccrochage...';
+
+  fetch('/api/hangupCall', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ sid: currentCallSid }),
+  })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        alert('Appel raccroché');
+
+        callBtn.disabled = false;
+        callBtn.textContent = 'Passer un appel';
+
+        // Supprime l'ancien écouteur et ajoute le nouveau
+        callBtn.removeEventListener('click', hangupCall);
+        callBtn.addEventListener('click', makeCall);
+
+        loadHistory(numberInput.value.trim()); // Recharger l'historique
+      } else {
+        alert('Erreur: ' + data.error);
+      }
+    })
+    .catch(err => {
+      console.error('Erreur:', err);
+      alert('Erreur réseau');
+
+      callBtn.disabled = false;
+      callBtn.textContent = 'Raccrocher'; // En cas d'échec, on le garde
+    });
+}
+
+// Variable globale pour stocker l'ID de l'appel en cours
+let currentCallSidThru = null;
+function makeCallThru() {
+  const numberFrom = select.value.trim();
+  const number = numberInput.value.trim();
+  if (!number) {
+    alert('Veuillez entrer un numéro de téléphone.');
+    return;
+  }
+  const personalNumber = numberCallThru.value.trim();
+
+  callThruBtn.disabled = true;
+  callThruBtn.innerText = 'Appel en cours...';
+
+  fetch('/api/makeCallThru', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ to: number, from: numberFrom, personalNumber:  })
+  })
+    .then(res => res.json())
+    .then(data => {
+      console.log('Appel lancé', data);
+      currentCallSid = data.sid;
+
+      callThruBtn.disabled = false;
+      callThruBtn.textContent = 'Raccrocher';
+
+      // Supprime l'ancien écouteur et ajoute le nouveau
+      callThruBtn.removeEventListener('click', makeCall);
+      callThruBtn.addEventListener('click', hangupCall);
+    })
+    .catch(err => {
+      console.error('Erreur:', err);
+      alert('Erreur lors du lancement de l’appel');
+
+      callThruBtn.disabled = false;
+      callThruBtn.innerText = 'Passer un appel';
+    });
+}
+
+async function afficherNumerosEtContacts(urlNumeros) {
+  try {
+    const res = await fetch(urlNumeros);
+    const data = await res.json();
+
+    if (!data.success || !Array.isArray(data.numbers)) {
+      phoneBar.innerHTML = '<p>Aucun numéro trouvé.</p>';
+      return;
+    }
+
+    // --- 1. Afficher les numéros dans phone-bar ---
+    phoneBar.innerHTML = '';
+    data.numbers.forEach(num => {
+      const p = document.createElement('p');
+      p.textContent = num;
+      p.className = 'phone-number-item';
+      p.addEventListener('click', async () => {
+        document.querySelectorAll('.phone-number-item').forEach(el => el.classList.remove('active'));
+        p.classList.add('active');
+        chatList.innerHTML = ''; // on vide la liste précédente
+        await chargerContactsPourNumero(num);
+      });
+      phoneBar.appendChild(p);
+    });
+
+    // --- 2. Charger les contacts récents pour ces numéros ---
+    chatList.innerHTML = '';
+    for (const num of data.numbers) {
+      await chargerContactsPourNumero(num);
+    }
+
+  } catch (err) {
+    console.error(err);
+    phoneBar.innerHTML = '<p>Erreur de chargement.</p>';
+  }
+}
+async function chargerContactsPourNumero(fromNumber) {
+  try {
+    const url = `/api/getContacts?number=${encodeURIComponent(fromNumber)}`;
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`Erreur HTTP: ${response.status}`);
+
+    const responseData = await response.json();
+
+    if (!responseData.success || !Array.isArray(responseData.contacts)) {
+      console.error(`Pas de contacts pour ${fromNumber}`);
+      return;
+    }
+
+    const section = document.createElement('div');
+    section.classList.add('twilio-section');
+
+    for (const contact of responseData.contacts) {
+      const contactName = await getContactName(contact.number);
+      const displayName = contactName || contact.number;
+
+      const item = document.createElement('div');
+      item.classList.add('chat-item');
+
+      const lastMessage = contact.lastMessage || '(aucun message)';
+      const date = contact.dateSent
+        ? new Date(contact.dateSent).toLocaleString()
+        : 'Date inconnue';
+
+      item.innerHTML = `
+        <strong>${displayName}</strong><br>
+        <small>${date}</small><br>
+        <span>${lastMessage.slice(0, 30)}...</span>
+      `;
+
+      item.addEventListener('click', () => {
+        loadHistory(contact.number, fromNumber);
+        document.getElementById('twilio-number').value = fromNumber;
+        document.getElementById('number').value = contact.number;
+      });
+
+      section.appendChild(item);
+    }
+
+    chatList.appendChild(section);
+
+  } catch (err) {
+    console.error(`Erreur pour ${fromNumber}:`, err);
+  }
+}
+
+// --- Gestion des clics ---
+btnBDH.addEventListener('click', () => {
+  afficherNumerosEtContacts('/api/getBdhNumbers');
+});
+
+btnBernardson.addEventListener('click', () => {
+  afficherNumerosEtContacts('/api/getBernardsonNumbers');
+});
+
+// Événement initial au chargement de la page
+callBtn.addEventListener('click', makeCall);
+callThruBtn.addEventListener('click', makeCallThru);
