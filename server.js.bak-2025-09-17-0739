@@ -1,0 +1,227 @@
+// server.js
+const express = require('express');
+const cors = require('cors');
+require('dotenv').config();
+const contactRoutes = require('./routes/contacts');
+
+const { VoiceResponse } = require('twilio').twiml;
+const { AccessToken } = require('twilio').jwt;
+const VoiceGrant = AccessToken.VoiceGrant;
+
+const app = express();
+const PORT = process.env.PORT || 4000;
+
+// Your Twilio keys
+const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID;
+const TWILIO_API_KEY_SID = process.env.TWILIO_API_KEY_SID;
+const TWILIO_API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET;
+const TWILIO_APP_SID = process.env.TWILIO_APP_SID;
+
+const corsOptions = {
+  origin: ['https://bcall.dev', 'https://www.bcall.dev'],
+  methods: 'GET,POST,PUT,DELETE,OPTIONS',
+  allowedHeaders: 'Content-Type,Authorization'
+};
+app.use(cors(corsOptions));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use('/api/contacts', contactRoutes);
+const API_KEY = process.env.API_KEY;
+
+// Middleware d'authentification
+app.use('/api/', (req, res, next) => {
+  const apiKey = req.headers['x-api-key'];
+  if (!apiKey || apiKey !== API_KEY) {
+    return res.status(403).json({ error: 'Unauthorized access' });
+  }
+  next();
+});
+// Access Token endpoint
+app.get('/generate-token', (req, res) => {
+    const identity = 'user-call-frontend-123';
+    // Create a Voice Grant for the Access Token
+    const voiceGrant = new VoiceGrant({
+        outgoingApplicationSid: TWILIO_APP_SID,
+        incomingAllow: true // Allows you to receive calls
+    });
+
+    // Create the Access Token with the Voice Grant
+    const token = new AccessToken(
+        TWILIO_ACCOUNT_SID,
+        TWILIO_API_KEY_SID,
+        TWILIO_API_KEY_SECRET,
+	{ identity: identity }
+    );
+    token.addGrant(voiceGrant);
+    // Return the token to the client
+    res.json({ token: token.toJwt() });
+});
+
+// New endpoint for TwiML
+app.post('/voice', (req, res) => {
+    console.log('Request body received:', req.body);
+    const to = req.body.To;
+    const from = req.body.From;
+    const twiml = new VoiceResponse();
+    if (to && from) {
+        twiml.dial({ callerId: from }, to); // Use the 'From' number as the 'callerId'
+    }
+    else {
+        twiml.say('Sorry, the recipient number is missing.');
+    }
+    res.type('text/xml').send(twiml.toString());
+});
+
+
+const TwilioNumbers = process.env.TWILIO_NUMBERS.split(',');
+const BernardsonNumbers = process.env.TWILIO_NUMBERS.split(',').slice(4, 7);
+const BDHNumbers = process.env.TWILIO_NUMBERS.split(',').slice(0, 4);;
+app.get('/getHistory', async (req, res) => {
+  const number = req.query.number;
+  const twilioNumber = req.query.twilioNumber;
+  if (!number) {
+    return res.status(400).json({ success: false, error: 'Number required' });
+  }
+  if (!twilioNumber) {
+    return res.status(400).json({ success: false, error: 'Twilio Number required' });
+  }
+  const secret = process.env.MY_SECRET;
+
+  try {
+    const url = `https://historyappservice-7315.twil.io/getHistory?number=${encodeURIComponent(number)}&twilioNumber=${encodeURIComponent(twilioNumber)}&secret=${encodeURIComponent(secret)}`;
+    const response = await fetch(url);
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/sendSms', async (req, res) => {
+  const { to, message, from } = req.body;
+  const secret = process.env.MY_SECRET;
+
+  if (!to || !message || !from) {
+    return res.status(400).json({ success: false, error: '"to", "from" and "message" parameters required' });
+  }
+
+  try {
+    const response = await fetch('https://messagingappservice-6767.twil.io/sendSms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ to, message, from, secret })
+    });
+
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/getContacts', async (req, res) => {
+  const secret = process.env.MY_SECRET;
+  const number = req.query.number;
+
+  if (!number) {
+    return res.status(400).json({ success: false, error: 'Number required' });
+  }
+  try {
+    const url = `https://recentcontacts-1749.twil.io/getRecentsContacts?number=${encodeURIComponent(number)}&secret=${encodeURIComponent(secret)}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const text = await response.text();
+      return res.status(response.status).json({ success: false, error: `Twilio Function Error : ${text}` });
+    }
+
+    const data = await response.json();
+
+    res.status(200).json(data);
+  } catch (err) {
+    console.error('Error in /getRecentsContacts backend :', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.post('/hangupCall', async (req, res) => {
+  const { sid } = req.body;
+  const secret = process.env.MY_SECRET;
+
+  if (!sid) {
+    return res.status(400).json({ success: false, error: 'CallSid required' });
+  }
+
+  try {
+    const response = await fetch('https://hangup-call-7130.twil.io/hangupCall', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ callSid: sid, secret })
+    });
+
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+app.get('/getTwilioNumbers', (req, res) => {
+  res.json({ success: true, numbers: TwilioNumbers });
+});
+app.get('/getBernardsonNumbers', (req, res) => {
+  res.json({ success: true, numbers: BernardsonNumbers });
+});
+
+app.get('/getBdhNumbers', (req, res) => {
+  res.json({ success: true, numbers: BDHNumbers });
+});
+
+app.post('/makeCallThru', async (req, res) => {
+  const { to, from, personalNumber } = req.body;
+  const secret = process.env.MY_SECRET;
+
+  if (!to || !from || !personalNumber) {
+    return res.status(400).json({ success: false, error: '"to", "from" and "personalNumber" parameters required' });
+  }
+
+  try {
+    const params = new URLSearchParams();
+    params.append('to', to);
+    params.append('from', from);
+    params.append('personalNumber', personalNumber);
+    params.append('secret', secret);
+
+    const response = await fetch('https://call-thru-function-8055.twil.io/call-thru', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params.toString()
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!data) {
+      return res.status(502).json({ success: false, error: 'Invalid response from Twilio server' });
+    }
+
+    res.status(response.status).json(data);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+const db = require('./db');
+
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      phone TEXT UNIQUE,
+      name TEXT
+    )
+  `);
+});
+
+app.listen(PORT, () => {
+  console.log(`✅ Server started on http://localhost:${PORT}`);
+});
